@@ -1009,6 +1009,7 @@ async function doRegister() {
   }catch(e){
     const m={'auth/email-already-in-use':'E-mail já cadastrado!','auth/weak-password':'Senha muito fraca!'};
     showToast(m[e.code]||'Erro ao criar conta.');
+    console.error("Firebase registration error:", e);
   }
 }
 async function doLogout() {
