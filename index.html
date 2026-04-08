@@ -854,11 +854,13 @@
 
 <!-- Firebase SDK -->
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import { getDatabase, ref, set, get, update, remove, push }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+  from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
+
 
 // ============================================================
 // ⚠️  SUBSTITUA PELOS SEUS DADOS DO FIREBASE CONSOLE
@@ -877,6 +879,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const analytics = getAnalytics(app);
 const db = getDatabase(app);
 
 const uid = () => auth.currentUser?.uid;
