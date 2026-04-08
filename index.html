@@ -1010,7 +1010,11 @@ async function doRegister() {
     const c=await createUserWithEmailAndPassword(auth,email,pass);
     await set(ref(db,`users/${c.user.uid}/profile`),{nickname:name,gender,kcalGoal:2000,createdAt:Date.now()});
   }catch(e){
-    const m={'auth/email-already-in-use':'E-mail já cadastrado!','auth/weak-password':'Senha muito fraca!'};
+    const m={
+      'auth/email-already-in-use': 'E-mail já cadastrado!',
+      'auth/weak-password': 'Senha muito fraca!',
+      'auth/configuration-not-found': 'Erro de configuração: Ative o login por E-mail/Senha no Console do Firebase.'
+    };
     showToast(m[e.code]||'Erro ao criar conta.');
     console.error("Firebase registration error:", e);
   }
