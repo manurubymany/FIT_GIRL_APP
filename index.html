@@ -5,11 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>FitGirl ✦ Seu app de bem-estar</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-
 <style>
   :root {
     --rose: #E8748A;
@@ -857,21 +852,40 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-<script>
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get, update, remove, push }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
 // ============================================================
-// FIREBASE CONFIGURATION
+// ⚠️  SUBSTITUA PELOS SEUS DADOS DO FIREBASE CONSOLE
+// Acesse: console.firebase.google.com → seu projeto → Configurações → Seu app web
 // ============================================================
 const firebaseConfig = {
-  apiKey: "YOUR_ACTUAL_API_KEY", 
+  apiKey: "COLE_SUA_API_KEY_AQUI",
   authDomain: "fit-girlapp.firebaseapp.com",
-  databaseURL: "https://fit-girlapp-default-rtdb.firebaseio.com/",
+  databaseURL: "https://fit-girlapp-default-rtdb.firebaseio.com",
   projectId: "fit-girlapp",
   storageBucket: "fit-girlapp.appspot.com",
-  messagingSenderId: "YOUR_ACTUAL_SENDER_ID",
-  appId: "YOUR_ACTUAL_APP_ID"
+  messagingSenderId: "COLE_SEU_SENDER_ID",
+  appId: "COLE_SEU_APP_ID"
 };
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+const uid = () => auth.currentUser?.uid;
+const todayKey = () => new Date().toISOString().split('T')[0].replace(/-/g,'_');
+
+async function fbSet(path, value)   { if (uid()) await set(ref(db,`users/${uid()}/${path}`), value); }
+async function fbGet(path)          { if (!uid()) return null; const s = await get(ref(db,`users/${uid()}/${path}`)); return s.exists()?s.val():null; }
+async function fbUpdate(path, value){ if (uid()) await update(ref(db,`users/${uid()}/${path}`), value); }
+async function fbPush(path, value)  { if (!uid()) return null; const r = push(ref(db,`users/${uid()}/${path}`)); await set(r,value); return r.key; }
+async function fbRemove(path)       { if (uid()) await remove(ref(db,`users/${uid()}/${path}`)); }
 
 // ============================================================
 // STATE
@@ -879,680 +893,416 @@ const db = firebase.database();
 let state = {
   user: null,
   foods: [
-    {id:1, name:'Arroz branco cozido', kcalPer100:130},
-    {id:2, name:'Frango grelhado', kcalPer100:165},
-    {id:3, name:'Feijão cozido', kcalPer100:77},
-    {id:4, name:'Batata doce cozida', kcalPer100:86},
-    {id:5, name:'Ovo mexido', kcalPer100:148},
-    {id:6, name:'Banana', kcalPer100:89},
-    {id:7, name:'Aveia', kcalPer100:389},
-    {id:8, name:'Iogurte grego', kcalPer100:97},
-    {id:9, name:'Maçã', kcalPer100:52},
-    {id:10, name:'Pão integral', kcalPer100:247},
+    {id:'food1', name:'Arroz branco cozido', kcalPer100:130},
+    {id:'food2', name:'Frango grelhado', kcalPer100:165},
+    {id:'food3', name:'Feijão cozido', kcalPer100:77},
+    {id:'food4', name:'Batata doce cozida', kcalPer100:86},
+    {id:'food5', name:'Ovo mexido', kcalPer100:148},
+    {id:'food6', name:'Banana', kcalPer100:89},
+    {id:'food7', name:'Aveia', kcalPer100:389},
+    {id:'food8', name:'Iogurte grego', kcalPer100:97},
+    {id:'food9', name:'Maçã', kcalPer100:52},
+    {id:'food10', name:'Pão integral', kcalPer100:247},
   ],
   meals: { cafe: [], almoco: [], cafetarde: [], janta: [] },
   treinos: [
-    {
-      id:1, name:'Treino A – Pernas 🦵', tipo:'Musculação', desc:'Foco em quadríceps, glúteos e posterior de coxa.',
-      exercicios: [
+    { id:'treino1', name:'Treino A – Pernas 🦵', tipo:'Musculação', desc:'Foco em quadríceps, glúteos e posterior de coxa.',
+      exercicios:[
         {name:'Agachamento livre', series:4, reps:12, carga:40, dica:'Mantenha as costas retas e joelhos alinhados com os pés.', progressao:'Aumente 2,5kg a cada semana.', rest:60},
         {name:'Leg Press 45°', series:3, reps:15, carga:80, dica:'Não bloqueie os joelhos na extensão completa.', progressao:'Aumente 5kg a cada 2 semanas.', rest:60},
         {name:'Glúteo no cabo', series:4, reps:15, carga:15, dica:'Contraia o glúteo no ponto máximo do movimento.', progressao:'Aumente 2,5kg quando dominar a técnica.', rest:45},
-      ]
-    },
-    {
-      id:2, name:'Treino B – Superior 💪', tipo:'Musculação', desc:'Ombros, costas e bíceps.',
-      exercicios: [
+      ]},
+    { id:'treino2', name:'Treino B – Superior 💪', tipo:'Musculação', desc:'Ombros, costas e bíceps.',
+      exercicios:[
         {name:'Remada curvada', series:4, reps:10, carga:25, dica:'Mantenha o core contraído e puxe para o umbigo.', progressao:'Aumente 2,5kg a cada 2 semanas.', rest:60},
         {name:'Desenvolvimento halteres', series:3, reps:12, carga:10, dica:'Expire ao subir, inspire ao descer.', progressao:'Aumente 1kg a cada semana.', rest:60},
         {name:'Rosca alternada', series:3, reps:12, carga:8, dica:'Não balance o tronco para ganhar impulso.', progressao:'Aumente 1kg a cada 2 semanas.', rest:45},
-      ]
-    },
+      ]},
   ],
-  currentScreen: 'kcal',
-  calMonth: new Date().getMonth(),
-  calYear: new Date().getFullYear(),
-  periodData: null,
-  cycleLength: 28,
-  periodDays: [],
-  tarefas: [],
-  editingTarefaId: null,
-  currentMealForAdd: null,
-  selectedFoodForMeal: null,
-  currentTreinoForEx: null,
-  profile: { nickname: 'Dani', gender: 'feminino', kcalGoal: 2000, altura: null },
-  pesoLog: [],
-  medidas: {},
-  diary: {},
-  timers: {},
+  currentScreen:'kcal', calMonth:new Date().getMonth(), calYear:new Date().getFullYear(),
+  periodData:null, cycleLength:28, tarefas:[], editingTarefaId:null,
+  currentMealForAdd:null, selectedFoodForMeal:null, currentTreinoForEx:null,
+  profile:{nickname:'',gender:'feminino',kcalGoal:2000}, pesoLog:[], medidas:{}, diary:{}, timers:{},
 };
 
 // ============================================================
 // INIT
 // ============================================================
 window.onload = () => {
-  firebase.auth().onAuthStateChanged(async (user) => {
-    if (user) {
-      state.user = { email: user.email, uid: user.uid };
-      await loadAllData();
-      hideLoader();
-      showApp();
-    } else {
-      hideLoader();
-      document.getElementById('app').classList.remove('active');
-      document.getElementById('auth-screen').classList.add('active');
-      updateTopbar();
-    }
-  });
-
-  // Init day chips
-  document.querySelectorAll('#tarefa-days-chips .chip').forEach(chip => {
-    chip.addEventListener('click', () => chip.classList.toggle('selected'));
+  document.querySelectorAll('#tarefa-days-chips .chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>chip.classList.toggle('selected'));
   });
 };
 
-function hideLoader() {
-  document.getElementById('loader').style.opacity = '0';
-  setTimeout(() => {
-    document.getElementById('loader').style.display = 'none';
-  }, 500);
-}
-
-async function loadAllData() {
-  const uid = firebase.auth().currentUser.uid;
-  const keys = ['foods','meals','treinos','profile','pesoLog','medidas','diary','tarefas','periodData','periodDays','cycleLength'];
-  const snapshot = await db.ref('users/' + uid).once('value');
-  const data = snapshot.val();
-  if (data) {
-    keys.forEach(k => {
-      if (data[k] !== undefined) state[k] = data[k];
-    });
+onAuthStateChanged(auth, async (user) => {
+  setTimeout(()=>{ document.getElementById('loader').style.opacity='0'; setTimeout(()=>document.getElementById('loader').style.display='none',500); }, 1200);
+  if (user) {
+    state.user = user;
+    await loadAll();
+    showApp();
+  } else {
+    document.getElementById('auth-screen').classList.add('active');
+    document.getElementById('app').classList.remove('active');
   }
-}
+});
 
-function saveData(key) {
-  const uid = firebase.auth().currentUser?.uid;
-  if (uid) {
-    db.ref('users/' + uid + '/' + key).set(state[key]);
-  }
+async function loadAll() {
+  showToast('Carregando seus dados... 🌸');
+  try {
+    const [profile, foods, meals, treinos, pesoLog, medidas, diary, tarefas, periodData, cycleLength] = await Promise.all([
+      fbGet('profile'), fbGet('foods'), fbGet('meals/'+todayKey()), fbGet('treinos'),
+      fbGet('measurements'), fbGet('medidas'), fbGet('diary'), fbGet('tasks'),
+      fbGet('cycle/lastPeriod'), fbGet('cycle/cycleLength'),
+    ]);
+    if (profile) state.profile = {...state.profile,...profile};
+    if (foods) {
+      const cf = Object.entries(foods).map(([id,f])=>({id,...f}));
+      cf.forEach(f=>{ if(!state.foods.find(d=>d.id===f.id)) state.foods.push(f); });
+    }
+    if (meals) ['cafe','almoco','cafetarde','janta'].forEach(m=>{ if(meals[m]) state.meals[m]=Object.values(meals[m]); });
+    if (treinos) {
+      Object.entries(treinos).forEach(([id,t])=>{
+        if(!state.treinos.find(d=>d.id===id)) state.treinos.push({id,...t,exercicios:t.exercicios?Object.values(t.exercicios):[]});
+      });
+    }
+    if (pesoLog) state.pesoLog = Object.values(pesoLog).sort((a,b)=>a.ts-b.ts);
+    if (medidas) state.medidas = medidas;
+    if (diary) state.diary = diary;
+    if (tarefas) state.tarefas = Object.entries(tarefas).map(([id,t])=>({id,...t}));
+    if (periodData) state.periodData = periodData;
+    if (cycleLength) state.cycleLength = cycleLength;
+  } catch(e) { showToast('Erro ao carregar dados.'); }
 }
 
 // ============================================================
 // AUTH
 // ============================================================
 function switchAuthTab(tab) {
-  document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='login')||(i===1&&tab==='register')));
+  document.querySelectorAll('.auth-tab').forEach((t,i)=>t.classList.toggle('active',(i===0&&tab==='login')||(i===1&&tab==='register')));
   document.getElementById('login-form').style.display = tab==='login'?'block':'none';
   document.getElementById('register-form').style.display = tab==='register'?'block':'none';
 }
-
-function doLogin() {
-  const email = document.getElementById('login-email').value;
-  const pass = document.getElementById('login-pass').value;
-  if (!email || !pass) { showToast('Preencha todos os campos!'); return; }
-  
-  firebase.auth().signInWithEmailAndPassword(email, pass)
-    .catch(error => showToast('Erro: ' + error.message));
+async function doLogin() {
+  const email=document.getElementById('login-email').value.trim();
+  const pass=document.getElementById('login-pass').value;
+  if(!email||!pass){showToast('Preencha todos os campos!');return;}
+  try{
+    showToast('Entrando... ✨');
+    await signInWithEmailAndPassword(auth,email,pass);
+  }catch(e){
+    const m={'auth/user-not-found':'Usuário não encontrado!','auth/wrong-password':'Senha incorreta!','auth/invalid-credential':'E-mail ou senha incorretos!'};
+    showToast(m[e.code]||'Erro ao entrar.');
+  }
 }
-
-function doRegister() {
-  const name = document.getElementById('reg-name').value;
-  const email = document.getElementById('reg-email').value;
-  const pass = document.getElementById('reg-pass').value;
-  const gender = document.getElementById('reg-gender').value;
-  if (!name || !email || !pass) { showToast('Preencha todos os campos!'); return; }
-  
-  firebase.auth().createUserWithEmailAndPassword(email, pass)
-    .then((userCredential) => {
-      const uid = userCredential.user.uid;
-      state.profile.nickname = name;
-      state.profile.gender = gender;
-      db.ref('users/' + uid + '/profile').set(state.profile);
-    })
-    .catch(error => showToast('Erro ao criar conta: ' + error.message));
+async function doRegister() {
+  const name=document.getElementById('reg-name').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const pass=document.getElementById('reg-pass').value;
+  const gender=document.getElementById('reg-gender').value;
+  if(!name||!email||!pass){showToast('Preencha todos os campos!');return;}
+  if(pass.length<6){showToast('Senha precisa ter pelo menos 6 caracteres!');return;}
+  try{
+    showToast('Criando conta... 🌸');
+    const c=await createUserWithEmailAndPassword(auth,email,pass);
+    await set(ref(db,`users/${c.user.uid}/profile`),{nickname:name,gender,kcalGoal:2000,createdAt:Date.now()});
+  }catch(e){
+    const m={'auth/email-already-in-use':'E-mail já cadastrado!','auth/weak-password':'Senha muito fraca!'};
+    showToast(m[e.code]||'Erro ao criar conta.');
+  }
 }
-
-function doLogout() {
-  firebase.auth().signOut().then(() => {
-    state.user = null;
-  });
+async function doLogout() {
+  await signOut(auth);
+  state.meals={cafe:[],almoco:[],cafetarde:[],janta:[]};
+  state.diary={}; state.tarefas=[]; state.pesoLog=[]; state.periodData=null;
 }
 
 function showApp() {
   document.getElementById('auth-screen').classList.remove('active');
   document.getElementById('app').classList.add('active');
-  updateTopbar();
-  renderKcal();
-  renderTreinos();
-  renderCalendar();
-  renderAconteceu();
-  renderTarefas();
-  renderSobre();
+  updateTopbar(); renderKcal(); renderTreinos(); renderCalendar(); renderAconteceu(); renderTarefas(); renderSobre();
+  showToast('Bem-vinda! 🌸');
 }
 
 // ============================================================
 // NAVIGATION
 // ============================================================
 function goToScreen(name) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById('screen-' + name).classList.add('active');
-  const idx = ['kcal','treinos','ciclo','aconteceu','tarefas','sobre'].indexOf(name);
-  document.querySelectorAll('.nav-item')[idx].classList.add('active');
-  state.currentScreen = name;
-  if (name === 'ciclo') renderCalendar();
-  if (name === 'sobre') renderSobre();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.nav-item')[['kcal','treinos','ciclo','aconteceu','tarefas','sobre'].indexOf(name)].classList.add('active');
+  if(name==='ciclo') renderCalendar();
+  if(name==='sobre') renderSobre();
 }
-
 function updateTopbar() {
-  const n = state.profile.nickname || state.user?.name || 'Você';
-  document.getElementById('topbar-name').textContent = n;
-  document.getElementById('user-avatar').textContent = n[0].toUpperCase();
+  const n=state.profile.nickname||state.user?.email?.split('@')[0]||'Você';
+  document.getElementById('topbar-name').textContent=n;
+  document.getElementById('user-avatar').textContent=n[0].toUpperCase();
 }
 
 // ============================================================
 // KCAL
 // ============================================================
-const MEAL_CONFIG = [
-  {key:'cafe', name:'Café da manhã', emoji:'☕'},
-  {key:'almoco', name:'Almoço', emoji:'🍱'},
-  {key:'cafetarde', name:'Café da tarde', emoji:'🫖'},
-  {key:'janta', name:'Janta', emoji:'🌙'},
-];
+const MEAL_CONFIG=[{key:'cafe',name:'Café da manhã',emoji:'☕'},{key:'almoco',name:'Almoço',emoji:'🍱'},{key:'cafetarde',name:'Café da tarde',emoji:'🫖'},{key:'janta',name:'Janta',emoji:'🌙'}];
 
 function renderKcal() {
-  const today = new Date();
-  document.getElementById('kcal-date').textContent = today.toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
-
-  const goal = state.profile.kcalGoal || 2000;
-  let total = 0;
-  MEAL_CONFIG.forEach(m => {
-    (state.meals[m.key] || []).forEach(i => total += i.kcal);
-  });
-
-  const pct = Math.min(total / goal, 1);
-  const circ = 2 * Math.PI * 63;
-  document.getElementById('kcal-arc').style.strokeDashoffset = circ * (1 - pct);
-  document.getElementById('kcal-consumed').textContent = Math.round(total);
-  document.getElementById('kcal-goal-display').textContent = goal;
-  document.getElementById('kcal-remaining').textContent = Math.max(0, goal - Math.round(total));
-  document.getElementById('kcal-pct').textContent = Math.round(pct * 100) + '%';
-
-  const container = document.getElementById('meals-container');
-  container.innerHTML = '';
-  MEAL_CONFIG.forEach(m => {
-    const items = state.meals[m.key] || [];
-    const mTotal = items.reduce((a,i) => a+i.kcal, 0);
-    container.innerHTML += `
-      <div class="card meal-section">
-        <div class="meal-header">
-          <div class="meal-name"><span class="meal-emoji">${m.emoji}</span>${m.name}</div>
-          <div class="meal-kcal-total">${Math.round(mTotal)} kcal</div>
-        </div>
-        <div class="meal-items" id="items-${m.key}">
-          ${items.map((it,idx) => `
-            <div class="meal-item">
-              <div>
-                <div class="meal-item-name">${it.name}</div>
-                <div class="meal-item-info">${it.grams}g</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div class="meal-item-kcal">${Math.round(it.kcal)} kcal</div>
-                <button class="icon-btn" onclick="removeMealItem('${m.key}',${idx})">✕</button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        <button class="btn-add-food" onclick="openAddToMeal('${m.key}','${m.name}')">+ Adicionar alimento</button>
-      </div>`;
+  document.getElementById('kcal-date').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long'});
+  const goal=state.profile.kcalGoal||2000;
+  let total=0;
+  MEAL_CONFIG.forEach(m=>(state.meals[m.key]||[]).forEach(i=>total+=i.kcal));
+  const pct=Math.min(total/goal,1), circ=2*Math.PI*63;
+  document.getElementById('kcal-arc').style.strokeDashoffset=circ*(1-pct);
+  document.getElementById('kcal-consumed').textContent=Math.round(total);
+  document.getElementById('kcal-goal-display').textContent=goal;
+  document.getElementById('kcal-remaining').textContent=Math.max(0,goal-Math.round(total));
+  document.getElementById('kcal-pct').textContent=Math.round(pct*100)+'%';
+  const c=document.getElementById('meals-container'); c.innerHTML='';
+  MEAL_CONFIG.forEach(m=>{
+    const items=state.meals[m.key]||[], mTotal=items.reduce((a,i)=>a+i.kcal,0);
+    c.innerHTML+=`<div class="card meal-section"><div class="meal-header"><div class="meal-name"><span class="meal-emoji">${m.emoji}</span>${m.name}</div><div class="meal-kcal-total">${Math.round(mTotal)} kcal</div></div><div class="meal-items">${items.map((it,idx)=>`<div class="meal-item"><div><div class="meal-item-name">${it.name}</div><div class="meal-item-info">${it.grams}g</div></div><div style="display:flex;align-items:center;gap:8px"><div class="meal-item-kcal">${Math.round(it.kcal)} kcal</div><button class="icon-btn" onclick="removeMealItem('${m.key}',${idx})">✕</button></div></div>`).join('')}</div><button class="btn-add-food" onclick="openAddToMeal('${m.key}','${m.name}')">+ Adicionar alimento</button></div>`;
   });
 }
 
-function openAddToMeal(mealKey, mealName) {
-  state.currentMealForAdd = mealKey;
-  state.selectedFoodForMeal = null;
-  document.getElementById('add-meal-title').textContent = 'Adicionar ao ' + mealName.toLowerCase();
-  document.getElementById('modal-food-search').value = '';
-  document.getElementById('modal-food-results').innerHTML = '';
-  document.getElementById('selected-food-area').style.display = 'none';
-  document.getElementById('food-kcal-preview').textContent = '';
+function openAddToMeal(mealKey,mealName) {
+  state.currentMealForAdd=mealKey; state.selectedFoodForMeal=null;
+  document.getElementById('add-meal-title').textContent='Adicionar ao '+mealName.toLowerCase();
+  document.getElementById('modal-food-search').value='';
+  document.getElementById('modal-food-results').innerHTML='';
+  document.getElementById('selected-food-area').style.display='none';
   openModal('modal-add-to-meal');
 }
-
 function searchFood(q) {
-  const res = document.getElementById('food-results');
-  if (!q) { res.style.display='none'; return; }
-  const found = state.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()));
-  if (!found.length) { res.style.display='none'; return; }
+  const res=document.getElementById('food-results');
+  if(!q){res.style.display='none';return;}
+  const found=state.foods.filter(f=>f.name.toLowerCase().includes(q.toLowerCase()));
+  if(!found.length){res.style.display='none';return;}
   res.style.display='block';
-  res.innerHTML = found.map(f => `
-    <div class="search-result-item" onclick="selectFoodForSearch('${f.id}')">
-      <div class="search-result-name">${f.name}</div>
-      <div class="search-result-kcal">${f.kcalPer100} kcal/100g</div>
-    </div>`).join('');
+  res.innerHTML=found.map(f=>`<div class="search-result-item" onclick="selectFoodForSearch('${f.id}')"><div class="search-result-name">${f.name}</div><div class="search-result-kcal">${f.kcalPer100} kcal/100g</div></div>`).join('');
 }
-
 function searchFoodInModal(q) {
-  const res = document.getElementById('modal-food-results');
-  if (!q) { res.innerHTML=''; return; }
-  const found = state.foods.filter(f => f.name.toLowerCase().includes(q.toLowerCase()));
-  res.innerHTML = found.map(f => `
-    <div class="search-result-item" style="border-radius:10px;margin-bottom:4px" onclick="selectFoodForMeal(${f.id})">
-      <div class="search-result-name">${f.name}</div>
-      <div class="search-result-kcal">${f.kcalPer100} kcal/100g</div>
-    </div>`).join('');
+  const res=document.getElementById('modal-food-results');
+  if(!q){res.innerHTML='';return;}
+  const found=state.foods.filter(f=>f.name.toLowerCase().includes(q.toLowerCase()));
+  res.innerHTML=found.map(f=>`<div class="search-result-item" style="border-radius:10px;margin-bottom:4px" onclick="selectFoodForMeal('${f.id}')"><div class="search-result-name">${f.name}</div><div class="search-result-kcal">${f.kcalPer100} kcal/100g</div></div>`).join('');
 }
-
 function selectFoodForMeal(id) {
-  const food = state.foods.find(f => f.id === id);
-  if (!food) return;
-  state.selectedFoodForMeal = food;
-  document.getElementById('modal-food-results').innerHTML = '';
-  document.getElementById('modal-food-search').value = '';
-  document.getElementById('selected-food-name').textContent = food.name + ' (' + food.kcalPer100 + ' kcal/100g)';
-  document.getElementById('selected-food-area').style.display = 'block';
-  document.getElementById('food-grams').value = '';
-  document.getElementById('food-kcal-preview').textContent = '';
+  const food=state.foods.find(f=>String(f.id)===String(id)); if(!food) return;
+  state.selectedFoodForMeal=food;
+  document.getElementById('modal-food-results').innerHTML='';
+  document.getElementById('modal-food-search').value='';
+  document.getElementById('selected-food-name').textContent=food.name+' ('+food.kcalPer100+' kcal/100g)';
+  document.getElementById('selected-food-area').style.display='block';
+  document.getElementById('food-grams').value='';
+  document.getElementById('food-kcal-preview').textContent='';
 }
-
 function calcFoodKcal() {
-  if (!state.selectedFoodForMeal) return;
-  const g = parseFloat(document.getElementById('food-grams').value) || 0;
-  const kcal = (g / 100) * state.selectedFoodForMeal.kcalPer100;
-  document.getElementById('food-kcal-preview').textContent = Math.round(kcal) + ' kcal';
+  if(!state.selectedFoodForMeal) return;
+  const g=parseFloat(document.getElementById('food-grams').value)||0;
+  document.getElementById('food-kcal-preview').textContent=Math.round((g/100)*state.selectedFoodForMeal.kcalPer100)+' kcal';
 }
-
-function confirmAddToMeal() {
-  if (!state.selectedFoodForMeal || !state.currentMealForAdd) { showToast('Selecione um alimento!'); return; }
-  const g = parseFloat(document.getElementById('food-grams').value);
-  if (!g || g <= 0) { showToast('Informe a quantidade!'); return; }
-  const kcal = (g / 100) * state.selectedFoodForMeal.kcalPer100;
-  if (!state.meals[state.currentMealForAdd]) state.meals[state.currentMealForAdd] = [];
-  state.meals[state.currentMealForAdd].push({ name: state.selectedFoodForMeal.name, grams: g, kcal });
-  saveData('meals');
-  closeModal('modal-add-to-meal');
-  renderKcal();
-  showToast('Alimento adicionado! 🍽️');
+async function confirmAddToMeal() {
+  if(!state.selectedFoodForMeal||!state.currentMealForAdd){showToast('Selecione um alimento!');return;}
+  const g=parseFloat(document.getElementById('food-grams').value);
+  if(!g||g<=0){showToast('Informe a quantidade!');return;}
+  const item={name:state.selectedFoodForMeal.name,grams:g,kcal:(g/100)*state.selectedFoodForMeal.kcalPer100,addedAt:Date.now()};
+  if(!state.meals[state.currentMealForAdd]) state.meals[state.currentMealForAdd]=[];
+  state.meals[state.currentMealForAdd].push(item);
+  await fbPush(`meals/${todayKey()}/${state.currentMealForAdd}`,item);
+  closeModal('modal-add-to-meal'); renderKcal(); showToast('Adicionado! 🍽️');
 }
-
-function removeMealItem(mealKey, idx) {
-  state.meals[mealKey].splice(idx, 1);
-  saveData('meals');
+async function removeMealItem(mealKey,idx) {
+  state.meals[mealKey].splice(idx,1);
+  const d={};
+  state.meals[mealKey].forEach((item,i)=>d['item'+i]=item);
+  await fbSet(`meals/${todayKey()}/${mealKey}`,Object.keys(d).length?d:null);
   renderKcal();
 }
-
-function addNewFood() {
-  const name = document.getElementById('new-food-name').value.trim();
-  const kcal = parseFloat(document.getElementById('new-food-kcal').value);
-  if (!name || !kcal) { showToast('Preencha todos os campos!'); return; }
-  state.foods.push({ id: Date.now(), name, kcalPer100: kcal });
-  saveData('foods');
-  closeModal('modal-add-food');
-  showToast('Alimento cadastrado! 🥗');
-  document.getElementById('new-food-name').value = '';
-  document.getElementById('new-food-kcal').value = '';
+async function addNewFood() {
+  const name=document.getElementById('new-food-name').value.trim();
+  const kcal=parseFloat(document.getElementById('new-food-kcal').value);
+  if(!name||!kcal){showToast('Preencha todos os campos!');return;}
+  const food={name,kcalPer100:kcal,isCustom:true,createdAt:Date.now()};
+  const key=await fbPush('foods',food);
+  state.foods.push({id:key,...food});
+  closeModal('modal-add-food'); showToast('Alimento cadastrado! 🥗');
+  document.getElementById('new-food-name').value=''; document.getElementById('new-food-kcal').value='';
 }
-
-function selectFoodForSearch(id) {
-  document.getElementById('food-results').style.display = 'none';
-  document.getElementById('food-search').value = '';
-}
+function selectFoodForSearch(id) { document.getElementById('food-results').style.display='none'; document.getElementById('food-search').value=''; }
 
 // ============================================================
 // TREINOS
 // ============================================================
 function renderTreinos(filter) {
-  const list = filter ? state.treinos.filter(t => t.name.toLowerCase().includes(filter.toLowerCase())) : state.treinos;
-  const container = document.getElementById('treinos-container');
-  container.innerHTML = list.map(t => `
-    <div class="treino-card">
-      <div class="treino-header">
-        <div class="treino-name">${t.name}</div>
-        <div class="treino-badge">${t.tipo}</div>
-      </div>
-      <div class="treino-desc">${t.desc}</div>
-      <div class="exercicios-list">
-        ${(t.exercicios||[]).map((ex,ei) => `
-          <div class="exercicio-item">
-            <div class="exercicio-name">${ex.name}</div>
-            <div class="exercicio-series">
-              <div class="serie-badge">📋 ${ex.series} séries</div>
-              <div class="serie-badge">🔁 ${ex.reps} reps</div>
-              <div class="serie-badge">⚖️ ${ex.carga}kg</div>
-            </div>
-            <div class="exercicio-dica">💡 ${ex.dica}</div>
-            <div class="exercicio-progressao">📈 ${ex.progressao}</div>
-            <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
-              <button class="timer-btn" onclick="startTimer(${t.id},${ei},${ex.rest})">⏱ ${ex.rest}s descanso</button>
-              <span class="timer-display" id="timer-${t.id}-${ei}"></span>
-            </div>
-          </div>
-        `).join('')}
-        <button class="btn-add-food" onclick="openAddExercicio(${t.id})">+ Adicionar exercício</button>
-      </div>
-    </div>
-  `).join('');
+  const list=filter?state.treinos.filter(t=>t.name.toLowerCase().includes(filter.toLowerCase())):state.treinos;
+  document.getElementById('treinos-container').innerHTML=list.map(t=>`
+    <div class="treino-card"><div class="treino-header"><div class="treino-name">${t.name}</div><div class="treino-badge">${t.tipo}</div></div>
+    <div class="treino-desc">${t.desc}</div>
+    <div class="exercicios-list">
+      ${(t.exercicios||[]).map((ex,ei)=>`<div class="exercicio-item"><div class="exercicio-name">${ex.name}</div>
+        <div class="exercicio-series"><div class="serie-badge">📋 ${ex.series} séries</div><div class="serie-badge">🔁 ${ex.reps} reps</div><div class="serie-badge">⚖️ ${ex.carga}kg</div></div>
+        <div class="exercicio-dica">💡 ${ex.dica}</div><div class="exercicio-progressao">📈 ${ex.progressao}</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+          <button class="timer-btn" onclick="startTimer('${t.id}',${ei},${ex.rest})">⏱ ${ex.rest}s descanso</button>
+          <span class="timer-display" id="timer-${t.id}-${ei}"></span>
+        </div></div>`).join('')}
+      <button class="btn-add-food" onclick="openAddExercicio('${t.id}')">+ Adicionar exercício</button>
+    </div></div>`).join('');
 }
-
-function searchTreino(q) { renderTreinos(q); }
-
-function addNewTreino() {
-  const name = document.getElementById('new-treino-name').value.trim();
-  const tipo = document.getElementById('new-treino-tipo').value;
-  const desc = document.getElementById('new-treino-desc').value.trim();
-  if (!name) { showToast('Informe o nome do treino!'); return; }
-  state.treinos.push({ id: Date.now(), name, tipo, desc, exercicios: [] });
-  saveData('treinos');
-  closeModal('modal-add-treino');
-  renderTreinos();
-  showToast('Treino criado! 💪');
+function searchTreino(q){renderTreinos(q);}
+async function addNewTreino() {
+  const name=document.getElementById('new-treino-name').value.trim();
+  const tipo=document.getElementById('new-treino-tipo').value;
+  const desc=document.getElementById('new-treino-desc').value.trim();
+  if(!name){showToast('Informe o nome!');return;}
+  const treino={name,tipo,desc,createdAt:Date.now()};
+  const key=await fbPush('treinos',treino);
+  state.treinos.push({id:key,...treino,exercicios:[]});
+  closeModal('modal-add-treino'); renderTreinos(); showToast('Treino criado! 💪');
 }
-
-function openAddExercicio(treinoId) {
-  state.currentTreinoForEx = treinoId;
-  openModal('modal-add-exercicio');
+function openAddExercicio(treinoId){state.currentTreinoForEx=treinoId; openModal('modal-add-exercicio');}
+async function confirmAddExercicio() {
+  const treino=state.treinos.find(t=>String(t.id)===String(state.currentTreinoForEx)); if(!treino) return;
+  const name=document.getElementById('new-ex-name').value.trim(); if(!name){showToast('Informe o nome!');return;}
+  const ex={name,series:parseInt(document.getElementById('new-ex-series').value)||3,reps:parseInt(document.getElementById('new-ex-reps').value)||12,carga:parseFloat(document.getElementById('new-ex-carga').value)||0,dica:document.getElementById('new-ex-dica').value||'Mantenha o foco na técnica.',progressao:document.getElementById('new-ex-prog').value||'Aumente gradualmente.',rest:parseInt(document.getElementById('new-ex-rest').value)||60};
+  await fbPush(`treinos/${treino.id}/exercicios`,ex);
+  treino.exercicios.push(ex);
+  closeModal('modal-add-exercicio'); renderTreinos(); showToast('Exercício adicionado! 🏋️');
 }
-
-function confirmAddExercicio() {
-  const treino = state.treinos.find(t => t.id === state.currentTreinoForEx);
-  if (!treino) return;
-  const name = document.getElementById('new-ex-name').value.trim();
-  if (!name) { showToast('Informe o nome!'); return; }
-  treino.exercicios.push({
-    name,
-    series: parseInt(document.getElementById('new-ex-series').value) || 3,
-    reps: parseInt(document.getElementById('new-ex-reps').value) || 12,
-    carga: parseFloat(document.getElementById('new-ex-carga').value) || 0,
-    dica: document.getElementById('new-ex-dica').value || 'Mantenha o foco na técnica.',
-    progressao: document.getElementById('new-ex-prog').value || 'Aumente gradualmente.',
-    rest: parseInt(document.getElementById('new-ex-rest').value) || 60,
-  });
-  saveData('treinos');
-  closeModal('modal-add-exercicio');
-  renderTreinos();
-  showToast('Exercício adicionado! 🏋️');
-}
-
-function startTimer(treinoId, exIdx, seconds) {
-  const key = `${treinoId}-${exIdx}`;
-  if (state.timers[key]) { clearInterval(state.timers[key]); delete state.timers[key]; }
-  let remaining = seconds;
-  const el = document.getElementById(`timer-${key}`);
-  if (!el) return;
-  const update = () => {
-    el.textContent = remaining + 's';
-    if (remaining <= 0) {
-      clearInterval(state.timers[key]);
-      delete state.timers[key];
-      el.textContent = '✅ Pronto!';
-      showToast('Descansou! Próxima série 💪');
-    }
-    remaining--;
-  };
-  update();
-  state.timers[key] = setInterval(update, 1000);
+function startTimer(treinoId,exIdx,seconds) {
+  const key=`${treinoId}-${exIdx}`;
+  if(state.timers[key]){clearInterval(state.timers[key]);delete state.timers[key];}
+  let r=seconds; const el=document.getElementById(`timer-${key}`); if(!el) return;
+  const upd=()=>{ el.textContent=r+'s'; if(r<=0){clearInterval(state.timers[key]);delete state.timers[key];el.textContent='✅ Pronto!';showToast('Próxima série! 💪');} r--; };
+  upd(); state.timers[key]=setInterval(upd,1000);
 }
 
 // ============================================================
 // CICLO
 // ============================================================
-const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const DAYS_PT = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const MONTHS_PT=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const DAYS_PT=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 function renderCalendar() {
-  const m = state.calMonth, y = state.calYear;
-  document.getElementById('cal-month-label').textContent = MONTHS_PT[m] + ' ' + y;
-
-  const labelsEl = document.getElementById('cal-days-labels');
-  labelsEl.innerHTML = DAYS_PT.map(d => `<div class="cal-day-label">${d}</div>`).join('');
-
-  const firstDay = new Date(y, m, 1).getDay();
-  const daysInMonth = new Date(y, m+1, 0).getDate();
-  const today = new Date();
-
-  let cycleDays = {};
-  if (state.periodData) {
-    const start = new Date(state.periodData.start);
-    const cycle = state.cycleLength || 28;
-    const periodLen = 5;
-    const pmsStart = 14;
-    const fertileStart = cycle - 16;
-    const fertileEnd = cycle - 12;
-
-    for (let offset = -1; offset < 3; offset++) {
-      const base = new Date(start);
-      base.setDate(base.getDate() + offset * cycle);
-      for (let d = 0; d < periodLen; d++) {
-        const dd = new Date(base);
-        dd.setDate(dd.getDate() + d);
-        if (dd.getMonth() === m && dd.getFullYear() === y) cycleDays[dd.getDate()] = 'period';
-      }
-      for (let d = fertileStart; d <= fertileEnd; d++) {
-        const dd = new Date(base);
-        dd.setDate(dd.getDate() + d);
-        if (dd.getMonth() === m && dd.getFullYear() === y) {
-          if (!cycleDays[dd.getDate()]) cycleDays[dd.getDate()] = 'fertile';
-        }
-      }
-      for (let d = cycle - pmsStart; d < cycle - pmsStart + 7; d++) {
-        const dd = new Date(base);
-        dd.setDate(dd.getDate() + d);
-        if (dd.getMonth() === m && dd.getFullYear() === y) {
-          if (!cycleDays[dd.getDate()]) cycleDays[dd.getDate()] = 'pms';
-        }
-      }
+  const m=state.calMonth,y=state.calYear;
+  document.getElementById('cal-month-label').textContent=MONTHS_PT[m]+' '+y;
+  document.getElementById('cal-days-labels').innerHTML=DAYS_PT.map(d=>`<div class="cal-day-label">${d}</div>`).join('');
+  const firstDay=new Date(y,m,1).getDay(), daysInMonth=new Date(y,m+1,0).getDate(), today=new Date();
+  let cycleDays={};
+  if(state.periodData){
+    const start=new Date(state.periodData.start), cycle=state.cycleLength||28;
+    for(let offset=-1;offset<3;offset++){
+      const base=new Date(start); base.setDate(base.getDate()+offset*cycle);
+      for(let d=0;d<5;d++){const dd=new Date(base);dd.setDate(dd.getDate()+d);if(dd.getMonth()===m&&dd.getFullYear()===y)cycleDays[dd.getDate()]='period';}
+      for(let d=cycle-16;d<=cycle-12;d++){const dd=new Date(base);dd.setDate(dd.getDate()+d);if(dd.getMonth()===m&&dd.getFullYear()===y&&!cycleDays[dd.getDate()])cycleDays[dd.getDate()]='fertile';}
+      for(let d=cycle-14;d<cycle-7;d++){const dd=new Date(base);dd.setDate(dd.getDate()+d);if(dd.getMonth()===m&&dd.getFullYear()===y&&!cycleDays[dd.getDate()])cycleDays[dd.getDate()]='pms';}
     }
   }
-
-  const grid = document.getElementById('cal-grid');
-  grid.innerHTML = '';
-  for (let i = 0; i < firstDay; i++) grid.innerHTML += '<div class="cal-day empty"></div>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const isToday = today.getDate()===d && today.getMonth()===m && today.getFullYear()===y;
-    const type = cycleDays[d] || '';
-    grid.innerHTML += `<div class="cal-day ${type} ${isToday?'today':''}" onclick="calDayClick(${d})">${d}</div>`;
-  }
-
-  updateCycleInfo();
-  checkTPM();
+  const grid=document.getElementById('cal-grid'); grid.innerHTML='';
+  for(let i=0;i<firstDay;i++) grid.innerHTML+='<div class="cal-day empty"></div>';
+  for(let d=1;d<=daysInMonth;d++){const isToday=today.getDate()===d&&today.getMonth()===m&&today.getFullYear()===y;grid.innerHTML+=`<div class="cal-day ${cycleDays[d]||''} ${isToday?'today':''}" onclick="calDayClick(${d})">${d}</div>`;}
+  updateCycleInfo(); checkTPM();
 }
-
 function updateCycleInfo() {
-  if (!state.periodData) return;
-  const start = new Date(state.periodData.start);
-  const cycle = state.cycleLength || 28;
-  const today = new Date();
-  const daysSinceStart = Math.floor((today - start) / 86400000);
-  const phase = daysSinceStart % cycle;
-  const daysToNext = cycle - phase;
-  const next = new Date(today); next.setDate(next.getDate() + daysToNext);
-  const fertileDay = new Date(start); fertileDay.setDate(fertileDay.getDate() + (cycle - 16));
-  const ovDay = new Date(start); ovDay.setDate(ovDay.getDate() + (cycle - 14));
-
-  document.getElementById('ci-next').textContent = next.toLocaleDateString('pt-BR', {day:'numeric',month:'short'});
-  document.getElementById('ci-fertile').textContent = fertileDay.toLocaleDateString('pt-BR', {day:'numeric',month:'short'});
-  document.getElementById('ci-ovulation').textContent = ovDay.toLocaleDateString('pt-BR', {day:'numeric',month:'short'});
-  document.getElementById('ci-duration').textContent = cycle + ' dias';
+  if(!state.periodData) return;
+  const start=new Date(state.periodData.start),cycle=state.cycleLength||28,today=new Date();
+  const phase=Math.floor((today-start)/86400000)%cycle;
+  const next=new Date(today); next.setDate(next.getDate()+(cycle-phase));
+  const fertile=new Date(start); fertile.setDate(fertile.getDate()+(cycle-16));
+  const ov=new Date(start); ov.setDate(ov.getDate()+(cycle-14));
+  document.getElementById('ci-next').textContent=next.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
+  document.getElementById('ci-fertile').textContent=fertile.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
+  document.getElementById('ci-ovulation').textContent=ov.toLocaleDateString('pt-BR',{day:'numeric',month:'short'});
+  document.getElementById('ci-duration').textContent=cycle+' dias';
 }
-
 function checkTPM() {
-  const area = document.getElementById('tpm-banner-area');
-  area.innerHTML = '';
-  if (!state.periodData) return;
-  const start = new Date(state.periodData.start);
-  const cycle = state.cycleLength || 28;
-  const today = new Date();
-  const daysSince = Math.floor((today - start) / 86400000) % cycle;
-  const isPMS = daysSince >= (cycle - 14) && daysSince < (cycle - 7);
-  if (isPMS) {
-    const msgs = [
-      'Você é incrível mesmo nos dias difíceis. 🌙',
-      'TPM não define quem você é. Você é poderosa! 💜',
-      'Cuide-se com amor hoje. Você merece! 🌸',
-      'Seus sentimentos são válidos. Respire fundo. ✨',
-      'Descanse sem culpa. Amanhã será melhor! 🌺',
-    ];
-    const msg = msgs[Math.floor(Math.random() * msgs.length)];
-    area.innerHTML = `<div class="tpm-banner"><h3>💜 Período de TPM</h3><p>${msg}</p></div>`;
+  const area=document.getElementById('tpm-banner-area'); area.innerHTML='';
+  if(!state.periodData) return;
+  const phase=Math.floor((new Date()-new Date(state.periodData.start))/86400000)%(state.cycleLength||28);
+  if(phase>=(state.cycleLength||28)-14&&phase<(state.cycleLength||28)-7){
+    const msgs=['Você é incrível mesmo nos dias difíceis. 🌙','TPM não define quem você é. Você é poderosa! 💜','Cuide-se com amor hoje. Você merece! 🌸','Seus sentimentos são válidos. Respire fundo. ✨','Descanse sem culpa. Amanhã será melhor! 🌺'];
+    area.innerHTML=`<div class="tpm-banner"><h3>💜 Período de TPM</h3><p>${msgs[Math.floor(Math.random()*msgs.length)]}</p></div>`;
   }
 }
-
-function changeMonth(d) {
-  state.calMonth += d;
-  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
-  if (state.calMonth < 0) { state.calMonth = 11; state.calYear--; }
-  renderCalendar();
-}
-
-function calDayClick(d) {
-  const date = `${state.calYear}-${String(state.calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  document.getElementById('period-start').value = date;
-  openModal('modal-period');
-}
-
-function savePeriod() {
-  const start = document.getElementById('period-start').value;
-  if (!start) { showToast('Selecione a data de início!'); return; }
-  state.periodData = { start, end: document.getElementById('period-end').value };
-  state.cycleLength = parseInt(document.getElementById('period-cycle').value) || 28;
-  saveData('periodData');
-  saveData('cycleLength');
-  closeModal('modal-period');
-  renderCalendar();
-  showToast('Ciclo registrado! 🌸');
+function changeMonth(d){state.calMonth+=d;if(state.calMonth>11){state.calMonth=0;state.calYear++;}if(state.calMonth<0){state.calMonth=11;state.calYear--;}renderCalendar();}
+function calDayClick(d){document.getElementById('period-start').value=`${state.calYear}-${String(state.calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;openModal('modal-period');}
+async function savePeriod() {
+  const start=document.getElementById('period-start').value; if(!start){showToast('Selecione a data!');return;}
+  state.periodData={start,end:document.getElementById('period-end').value||''};
+  state.cycleLength=parseInt(document.getElementById('period-cycle').value)||28;
+  await fbUpdate('cycle',{lastPeriod:state.periodData,cycleLength:state.cycleLength,updatedAt:Date.now()});
+  await fbPush('cycle/history',{...state.periodData,recordedAt:Date.now()});
+  closeModal('modal-period'); renderCalendar(); showToast('Ciclo registrado! 🌸');
 }
 
 // ============================================================
 // O QUE ACONTECEU
 // ============================================================
 function renderAconteceu() {
-  const today = new Date();
-  document.getElementById('aconteceu-date').textContent = today.toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-
-  const boas = document.getElementById('boas-container');
-  const ruins = document.getElementById('ruins-container');
-  boas.innerHTML = '';
-  ruins.innerHTML = '';
-
-  const now = new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'});
-  for (let i = 0; i < 3; i++) {
-    boas.innerHTML += `<div class="aconteceu-item"><textarea id="boa-${i}" placeholder="Coisa boa ${i+1}..."></textarea><div class="time-tag">${now}</div></div>`;
-    ruins.innerHTML += `<div class="aconteceu-item bad"><textarea id="ruim-${i}" placeholder="Coisa difícil ${i+1}..."></textarea><div class="time-tag">${now}</div></div>`;
-  }
-
+  document.getElementById('aconteceu-date').textContent=new Date().toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const now=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+  document.getElementById('boas-container').innerHTML=[0,1,2].map(i=>`<div class="aconteceu-item"><textarea id="boa-${i}" placeholder="Coisa boa ${i+1}..."></textarea><div class="time-tag">${now}</div></div>`).join('');
+  document.getElementById('ruins-container').innerHTML=[0,1,2].map(i=>`<div class="aconteceu-item bad"><textarea id="ruim-${i}" placeholder="Coisa difícil ${i+1}..."></textarea><div class="time-tag">${now}</div></div>`).join('');
   renderDiaryLog();
 }
-
-function saveDiary() {
-  const todayKey = new Date().toLocaleDateString('pt-BR');
-  const boas = [0,1,2].map(i => document.getElementById('boa-'+i)?.value || '').filter(Boolean);
-  const ruins = [0,1,2].map(i => document.getElementById('ruim-'+i)?.value || '').filter(Boolean);
-  if (!boas.length && !ruins.length) { showToast('Escreva algo primeiro!'); return; }
-  if (!state.diary) state.diary = {};
-  state.diary[todayKey] = { boas, ruins, time: new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'}), date: todayKey };
-  saveData('diary');
-  renderDiaryLog();
-  showToast('Dia registrado! 📝');
+async function saveDiary() {
+  const key=todayKey();
+  const boas=[0,1,2].map(i=>document.getElementById('boa-'+i)?.value||'').filter(Boolean);
+  const ruins=[0,1,2].map(i=>document.getElementById('ruim-'+i)?.value||'').filter(Boolean);
+  if(!boas.length&&!ruins.length){showToast('Escreva algo primeiro!');return;}
+  const entry={boas,ruins,time:new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}),date:key,savedAt:Date.now()};
+  if(!state.diary) state.diary={};
+  state.diary[key]=entry;
+  await fbSet(`diary/${key}`,entry);
+  renderDiaryLog(); showToast('Dia registrado! 📝');
 }
-
 function renderDiaryLog() {
-  const log = document.getElementById('diary-log');
-  if (!state.diary) return;
-  const entries = Object.entries(state.diary).reverse().slice(0, 7);
-  if (!entries.length) { log.innerHTML = ''; return; }
-  log.innerHTML = entries.map(([date, entry]) => `
-    <div class="card" style="margin-bottom:12px">
-      <div style="font-size:0.78rem;color:var(--text-soft);margin-bottom:10px">📅 ${date} às ${entry.time}</div>
-      ${entry.boas?.length ? `<div style="font-size:0.8rem;color:var(--sage);font-weight:600;margin-bottom:6px">🌟 Coisas boas</div>${entry.boas.map(b=>`<div style="font-size:0.85rem;margin-bottom:4px;color:var(--text)">• ${b}</div>`).join('')}` : ''}
-      ${entry.ruins?.length ? `<div style="font-size:0.8rem;color:var(--rose);font-weight:600;margin:10px 0 6px">🌧️ Coisas difíceis</div>${entry.ruins.map(r=>`<div style="font-size:0.85rem;margin-bottom:4px;color:var(--text)">• ${r}</div>`).join('')}` : ''}
-    </div>`).join('');
+  const log=document.getElementById('diary-log'); if(!state.diary) return;
+  const entries=Object.entries(state.diary).reverse().slice(0,7);
+  if(!entries.length){log.innerHTML='';return;}
+  log.innerHTML=entries.map(([date,entry])=>`<div class="card" style="margin-bottom:12px"><div style="font-size:0.78rem;color:var(--text-soft);margin-bottom:10px">📅 ${date.replace(/_/g,'/')} às ${entry.time}</div>${entry.boas?.length?`<div style="font-size:0.8rem;color:var(--sage);font-weight:600;margin-bottom:6px">🌟 Coisas boas</div>${entry.boas.map(b=>`<div style="font-size:0.85rem;margin-bottom:4px">• ${b}</div>`).join('')}`:''}${entry.ruins?.length?`<div style="font-size:0.8rem;color:var(--rose);font-weight:600;margin:10px 0 6px">🌧️ Coisas difíceis</div>${entry.ruins.map(r=>`<div style="font-size:0.85rem;margin-bottom:4px">• ${r}</div>`).join('')}`:''}</div>`).join('');
 }
 
 // ============================================================
 // TAREFAS
 // ============================================================
-const DAYS_OF_WEEK = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
-
+const DAYS_OF_WEEK=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 function renderTarefas() {
-  const strip = document.getElementById('weekday-strip');
-  const today = new Date().getDay();
-  strip.innerHTML = DAYS_OF_WEEK.map((d,i) => `
-    <button class="wd-btn ${i===today?'active':''}" onclick="filterByDay('${d}',this)">${d}</button>`).join('');
-
+  const today=new Date().getDay();
+  document.getElementById('weekday-strip').innerHTML=DAYS_OF_WEEK.map((d,i)=>`<button class="wd-btn ${i===today?'active':''}" onclick="filterByDay('${d}',this)">${d}</button>`).join('');
   filterByDay(DAYS_OF_WEEK[today]);
 }
-
-function filterByDay(day, btn) {
-  if (btn) {
-    document.querySelectorAll('.wd-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
+function filterByDay(day,btn) {
+  if(btn){document.querySelectorAll('.wd-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+  const container=document.getElementById('tarefas-container');
+  const filtered=state.tarefas.filter(t=>t.days.includes(day));
+  if(!filtered.length){container.innerHTML='<div style="text-align:center;color:var(--text-soft);padding:24px;font-size:0.9rem">Nenhuma tarefa para este dia. 🌸</div>';return;}
+  container.innerHTML=filtered.map(t=>`<div class="tarefa-item"><div class="tarefa-check ${t.done?'done':''}" onclick="toggleTarefa('${t.id}')"></div><div class="tarefa-content"><div class="tarefa-title ${t.done?'done-text':''}">${t.name}</div><div class="tarefa-meta">${t.time?`<span class="tarefa-time">⏰ ${t.time}</span>`:''}<div class="tarefa-days">${t.days.map(d=>`<span class="day-chip">${d}</span>`).join('')}</div></div></div><div class="tarefa-actions"><button class="icon-btn" onclick="editTarefa('${t.id}')">✏️</button><button class="icon-btn" onclick="deleteTarefa('${t.id}')">🗑️</button></div></div>`).join('');
+}
+async function saveTarefa() {
+  const name=document.getElementById('new-tarefa-name').value.trim(); if(!name){showToast('Informe a tarefa!');return;}
+  const days=[...document.querySelectorAll('#tarefa-days-chips .chip.selected')].map(c=>c.dataset.day);
+  if(!days.length){showToast('Selecione ao menos um dia!');return;}
+  const time=document.getElementById('new-tarefa-time').value;
+  if(state.editingTarefaId){
+    const t=state.tarefas.find(t=>t.id===state.editingTarefaId);
+    if(t){t.name=name;t.time=time;t.days=days;await fbUpdate(`tasks/${t.id}`,{name,time,days,updatedAt:Date.now()});}
+    state.editingTarefaId=null; document.getElementById('tarefa-modal-title').textContent='Nova tarefa';
+  }else{
+    const tarefa={name,time,days,done:false,createdAt:Date.now()};
+    const key=await fbPush('tasks',tarefa);
+    state.tarefas.push({id:key,...tarefa});
   }
-  const container = document.getElementById('tarefas-container');
-  const filtered = state.tarefas.filter(t => t.days.includes(day));
-  if (!filtered.length) {
-    container.innerHTML = '<div style="text-align:center;color:var(--text-soft);padding:24px;font-size:0.9rem">Nenhuma tarefa para este dia. 🌸</div>';
-    return;
-  }
-  container.innerHTML = filtered.map(t => `
-    <div class="tarefa-item">
-      <div class="tarefa-check ${t.done?'done':''}" onclick="toggleTarefa('${t.id}')"></div>
-      <div class="tarefa-content">
-        <div class="tarefa-title ${t.done?'done-text':''}">${t.name}</div>
-        <div class="tarefa-meta">
-          ${t.time ? `<span class="tarefa-time">⏰ ${t.time}</span>` : ''}
-          <div class="tarefa-days">${t.days.map(d=>`<span class="day-chip">${d}</span>`).join('')}</div>
-        </div>
-      </div>
-      <div class="tarefa-actions">
-        <button class="icon-btn" onclick="editTarefa('${t.id}')">✏️</button>
-        <button class="icon-btn" onclick="deleteTarefa('${t.id}')">🗑️</button>
-      </div>
-    </div>`).join('');
+  closeModal('modal-add-tarefa'); renderTarefas(); showToast('Tarefa salva! ✅');
 }
-
-function saveTarefa() {
-  const name = document.getElementById('new-tarefa-name').value.trim();
-  if (!name) { showToast('Informe a tarefa!'); return; }
-  const days = [...document.querySelectorAll('#tarefa-days-chips .chip.selected')].map(c => c.dataset.day);
-  if (!days.length) { showToast('Selecione ao menos um dia!'); return; }
-  const time = document.getElementById('new-tarefa-time').value;
-
-  if (state.editingTarefaId) {
-    const t = state.tarefas.find(t => t.id === state.editingTarefaId);
-    if (t) { t.name = name; t.time = time; t.days = days; }
-    state.editingTarefaId = null;
-    document.getElementById('tarefa-modal-title').textContent = 'Nova tarefa';
-  } else {
-    state.tarefas.push({ id: Date.now().toString(), name, time, days, done: false });
-  }
-  saveData('tarefas');
-  closeModal('modal-add-tarefa');
-  renderTarefas();
-  showToast('Tarefa salva! ✅');
-}
-
-function toggleTarefa(id) {
-  const t = state.tarefas.find(t => t.id === id);
-  if (t) { t.done = !t.done; saveData('tarefas'); renderTarefas(); }
-}
-
-function deleteTarefa(id) {
-  state.tarefas = state.tarefas.filter(t => t.id !== id);
-  saveData('tarefas');
-  renderTarefas();
-  showToast('Tarefa removida!');
-}
-
+async function toggleTarefa(id){const t=state.tarefas.find(t=>t.id===id);if(t){t.done=!t.done;await fbUpdate(`tasks/${id}`,{done:t.done,[`doneHistory/${todayKey()}`]:t.done});renderTarefas();}}
+async function deleteTarefa(id){state.tarefas=state.tarefas.filter(t=>t.id!==id);await fbRemove(`tasks/${id}`);renderTarefas();showToast('Tarefa removida!');}
 function editTarefa(id) {
-  const t = state.tarefas.find(t => t.id === id);
-  if (!t) return;
-  state.editingTarefaId = id;
-  document.getElementById('new-tarefa-name').value = t.name;
-  document.getElementById('new-tarefa-time').value = t.time || '';
-  document.querySelectorAll('#tarefa-days-chips .chip').forEach(c => {
-    c.classList.toggle('selected', t.days.includes(c.dataset.day));
-  });
-  document.getElementById('tarefa-modal-title').textContent = 'Editar tarefa';
+  const t=state.tarefas.find(t=>t.id===id); if(!t) return;
+  state.editingTarefaId=id;
+  document.getElementById('new-tarefa-name').value=t.name;
+  document.getElementById('new-tarefa-time').value=t.time||'';
+  document.querySelectorAll('#tarefa-days-chips .chip').forEach(c=>c.classList.toggle('selected',t.days.includes(c.dataset.day)));
+  document.getElementById('tarefa-modal-title').textContent='Editar tarefa';
   openModal('modal-add-tarefa');
 }
 
@@ -1560,134 +1310,77 @@ function editTarefa(id) {
 // SOBRE MIM
 // ============================================================
 function renderSobre() {
-  const p = state.profile;
-  document.getElementById('profile-name-display').textContent = p.nickname || 'Você';
-  document.getElementById('profile-gender-display').textContent = p.gender === 'feminino' ? '♀ Feminino' : '♂ Masculino';
-  document.getElementById('p-nickname').value = p.nickname || '';
-  document.getElementById('p-gender').value = p.gender || 'feminino';
-  document.getElementById('p-kcal-goal').value = p.kcalGoal || 2000;
-
-  const log = state.pesoLog || [];
-  const lastPeso = log.length ? log[log.length-1].peso : null;
-  const metaPeso = p.metaPeso || null;
-
-  document.getElementById('stat-peso').textContent = lastPeso ? lastPeso + 'kg' : '--';
-  document.getElementById('stat-meta-peso').textContent = metaPeso ? metaPeso + 'kg' : '--';
-
-  if (lastPeso && p.medidas?.altura) {
-    const h = p.medidas.altura / 100;
-    const imc = (lastPeso / (h*h)).toFixed(1);
-    document.getElementById('stat-imc').textContent = imc;
-  } else {
-    document.getElementById('stat-imc').textContent = '--';
-  }
-
-  const m = state.medidas || {};
-  ['cintura','quadril','busto','coxa','braco','altura'].forEach(k => {
-    const el = document.getElementById('m-'+k);
-    if (el) el.value = m[k] || '';
-  });
-
-  renderWeightGraph();
-  renderPesoLog();
-  updateTopbar();
+  const p=state.profile;
+  document.getElementById('profile-name-display').textContent=p.nickname||'Você';
+  document.getElementById('profile-gender-display').textContent=p.gender==='feminino'?'♀ Feminino':'♂ Masculino';
+  document.getElementById('p-nickname').value=p.nickname||'';
+  document.getElementById('p-gender').value=p.gender||'feminino';
+  document.getElementById('p-kcal-goal').value=p.kcalGoal||2000;
+  const log=state.pesoLog||[], lastPeso=log.length?log[log.length-1].peso:null;
+  document.getElementById('stat-peso').textContent=lastPeso?lastPeso+'kg':'--';
+  document.getElementById('stat-meta-peso').textContent=p.metaPeso?p.metaPeso+'kg':'--';
+  if(lastPeso&&state.medidas?.altura){const h=state.medidas.altura/100;document.getElementById('stat-imc').textContent=(lastPeso/(h*h)).toFixed(1);}
+  else document.getElementById('stat-imc').textContent='--';
+  ['cintura','quadril','busto','coxa','braco','altura'].forEach(k=>{const el=document.getElementById('m-'+k);if(el)el.value=state.medidas[k]||'';});
+  renderWeightGraph(); renderPesoLog(); updateTopbar();
 }
-
-function saveProfile() {
-  state.profile.nickname = document.getElementById('p-nickname').value;
-  state.profile.gender = document.getElementById('p-gender').value;
-  state.profile.kcalGoal = parseInt(document.getElementById('p-kcal-goal').value) || 2000;
-  saveData('profile');
-  updateTopbar();
-  renderSobre();
+async function saveProfile() {
+  state.profile.nickname=document.getElementById('p-nickname').value;
+  state.profile.gender=document.getElementById('p-gender').value;
+  state.profile.kcalGoal=parseInt(document.getElementById('p-kcal-goal').value)||2000;
+  await fbUpdate('profile',state.profile);
+  updateTopbar(); renderSobre(); showToast('Perfil salvo! 🌸');
 }
-
-function saveMedidas() {
-  ['cintura','quadril','busto','coxa','braco','altura'].forEach(k => {
-    const el = document.getElementById('m-'+k);
-    if (el && el.value) state.medidas[k] = parseFloat(el.value);
-  });
-  saveData('medidas');
-  renderSobre();
+async function saveMedidas() {
+  ['cintura','quadril','busto','coxa','braco','altura'].forEach(k=>{const el=document.getElementById('m-'+k);if(el&&el.value)state.medidas[k]=parseFloat(el.value);});
+  await fbSet('medidas',state.medidas);
 }
-
-function savePeso() {
-  const peso = parseFloat(document.getElementById('new-peso').value);
-  const meta = parseFloat(document.getElementById('new-meta-peso').value);
-  if (!peso) { showToast('Informe o peso!'); return; }
-  if (!state.pesoLog) state.pesoLog = [];
-  state.pesoLog.push({ peso, date: new Date().toLocaleDateString('pt-BR'), ts: Date.now() });
-  if (meta) state.profile.metaPeso = meta;
-  saveData('pesoLog');
-  saveData('profile');
-  closeModal('modal-add-peso');
-  renderSobre();
-  showToast('Peso registrado! 📊');
+async function savePeso() {
+  const peso=parseFloat(document.getElementById('new-peso').value);
+  const meta=parseFloat(document.getElementById('new-meta-peso').value);
+  if(!peso){showToast('Informe o peso!');return;}
+  const entry={peso,date:new Date().toLocaleDateString('pt-BR'),ts:Date.now()};
+  if(!state.pesoLog)state.pesoLog=[];
+  state.pesoLog.push(entry);
+  if(meta)state.profile.metaPeso=meta;
+  await fbPush('measurements',entry);
+  if(meta)await fbUpdate('profile',{metaPeso:meta});
+  closeModal('modal-add-peso'); renderSobre(); showToast('Peso registrado! 📊');
 }
-
 function renderWeightGraph() {
-  const graph = document.getElementById('weight-graph');
-  const log = (state.pesoLog || []).slice(-7);
-  if (!log.length) { graph.innerHTML = '<div style="width:100%;text-align:center;color:var(--text-soft);font-size:0.85rem;padding-top:40px">Nenhum peso registrado ainda.</div>'; return; }
-  const max = Math.max(...log.map(e=>e.peso)) + 2;
-  const min = Math.min(...log.map(e=>e.peso)) - 2;
-  graph.innerHTML = log.map(e => {
-    const h = Math.round(((e.peso - min) / (max - min)) * 90) + 10;
-    return `<div class="graph-bar-wrap">
-      <div class="graph-bar-val">${e.peso}</div>
-      <div class="graph-bar" style="height:${h}px"></div>
-      <div class="graph-bar-lbl">${e.date.slice(0,5)}</div>
-    </div>`;
-  }).join('');
-
-  if (log.length >= 2) {
-    const diff = (log[log.length-1].peso - log[0].peso).toFixed(1);
-    const sign = diff > 0 ? '+' : '';
-    document.getElementById('peso-diff-label').textContent = `Variação: ${sign}${diff}kg`;
-  }
+  const graph=document.getElementById('weight-graph'), log=(state.pesoLog||[]).slice(-7);
+  if(!log.length){graph.innerHTML='<div style="width:100%;text-align:center;color:var(--text-soft);font-size:0.85rem;padding-top:40px">Nenhum peso registrado ainda.</div>';return;}
+  const max=Math.max(...log.map(e=>e.peso))+2, min=Math.min(...log.map(e=>e.peso))-2;
+  graph.innerHTML=log.map(e=>{const h=Math.round(((e.peso-min)/(max-min))*90)+10;return`<div class="graph-bar-wrap"><div class="graph-bar-val">${e.peso}</div><div class="graph-bar" style="height:${h}px"></div><div class="graph-bar-lbl">${e.date.slice(0,5)}</div></div>`;}).join('');
+  if(log.length>=2){const diff=(log[log.length-1].peso-log[0].peso).toFixed(1);document.getElementById('peso-diff-label').textContent=`Variação: ${diff>0?'+':''}${diff}kg`;}
 }
-
 function renderPesoLog() {
-  const tbody = document.getElementById('peso-log-body');
-  const log = (state.pesoLog || []).slice().reverse();
-  if (!log.length) { tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:var(--text-soft)">Sem registros</td></tr>'; return; }
-  tbody.innerHTML = log.map((e,i) => {
-    const prev = log[i+1];
-    let trend = '';
-    if (prev) {
-      const diff = (e.peso - prev.peso).toFixed(1);
-      trend = diff < 0 ? `<span class="log-trend down">▼ ${Math.abs(diff)}</span>` : diff > 0 ? `<span class="log-trend up">▲ ${diff}</span>` : '—';
-    }
-    return `<tr><td>${e.date}</td><td><strong>${e.peso} kg</strong></td><td>${trend}</td></tr>`;
-  }).join('');
+  const tbody=document.getElementById('peso-log-body'), log=(state.pesoLog||[]).slice().reverse();
+  if(!log.length){tbody.innerHTML='<tr><td colspan="3" style="text-align:center;color:var(--text-soft)">Sem registros</td></tr>';return;}
+  tbody.innerHTML=log.map((e,i)=>{const prev=log[i+1];let trend='';if(prev){const diff=(e.peso-prev.peso).toFixed(1);trend=diff<0?`<span class="log-trend down">▼ ${Math.abs(diff)}</span>`:diff>0?`<span class="log-trend up">▲ ${diff}</span>`:'—';}return`<tr><td>${e.date}</td><td><strong>${e.peso} kg</strong></td><td>${trend}</td></tr>`;}).join('');
 }
 
 // ============================================================
-// MODALS
+// MODALS & TOAST
 // ============================================================
-function openModal(id) {
-  document.getElementById(id).classList.add('active');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('active');
-}
-// Close on overlay click
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('active'); });
+function openModal(id){document.getElementById(id).classList.add('active');}
+function closeModal(id){document.getElementById(id).classList.remove('active');}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('active');}));
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800);}
+
+// Expor funções para onclick no HTML (type="module" isola o escopo)
+Object.assign(window,{
+  switchAuthTab,doLogin,doRegister,doLogout,goToScreen,
+  openAddToMeal,searchFood,searchFoodInModal,selectFoodForMeal,calcFoodKcal,confirmAddToMeal,removeMealItem,addNewFood,selectFoodForSearch,
+  renderTreinos,searchTreino,addNewTreino,openAddExercicio,confirmAddExercicio,startTimer,
+  changeMonth,calDayClick,savePeriod,
+  saveDiary,
+  filterByDay,saveTarefa,toggleTarefa,deleteTarefa,editTarefa,
+  saveProfile,saveMedidas,savePeso,
+  openModal,closeModal,
 });
 
-// ============================================================
-// TOAST
-// ============================================================
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2800);
-}
-
-// Set today's date for period
-document.getElementById('period-start').value = new Date().toISOString().split('T')[0];
+document.getElementById('period-start').value=new Date().toISOString().split('T')[0];
 </script>
 </body>
 </html>
